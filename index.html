@@ -1,0 +1,836 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#172126">
+  <title>Rechnung erstellen | IhrMotor.de</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #172126;
+      --muted: #66747a;
+      --line: #dbe1e2;
+      --paper: #fff;
+      --canvas: #eef1f1;
+      --accent: #c83d30;
+      --accent-dark: #a72c23;
+      --soft: #f6f8f8;
+      font-family: Inter, "Segoe UI", Arial, sans-serif;
+      color: var(--ink);
+      background: var(--canvas);
+    }
+
+    * { box-sizing: border-box; }
+    body { margin: 0; min-width: 320px; }
+    button, input, select, textarea { font: inherit; }
+    button { cursor: pointer; }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 18px clamp(16px, 4vw, 56px);
+      color: #fff;
+      background: var(--ink);
+    }
+
+    .topbar-brand { font-size: 1.1rem; font-weight: 800; letter-spacing: .02em; }
+    .topbar-caption { color: #c4ccce; font-size: .9rem; }
+    .page { max-width: 1500px; margin: 0 auto; padding: 26px clamp(14px, 3vw, 40px) 48px; }
+    .intro { margin-bottom: 20px; }
+    h1 { margin: 0 0 6px; font-size: clamp(1.45rem, 3vw, 2rem); }
+    .intro p { margin: 0; color: var(--muted); }
+    .privacy-note, .price-note, .message {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 11px 14px;
+      font-size: .9rem;
+    }
+    .privacy-note { margin: 16px 0 20px; background: #edf6f1; border-color: #c9dfd2; }
+    .price-note { margin: 0 0 18px; background: #fff8e9; border-color: #e9d9ae; }
+    .message { display: none; margin: 0 0 16px; }
+    .message.visible { display: block; }
+    .message.error { color: #7c211a; background: #fff0ee; border-color: #efc3bd; }
+    .message.success { color: #205b36; background: #edf6f1; border-color: #c9dfd2; }
+
+    .workspace { display: grid; grid-template-columns: minmax(320px, .92fr) minmax(540px, 1.08fr); gap: 22px; align-items: start; }
+    .editor, .preview-column { min-width: 0; }
+    .preview-column { position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow-y: auto; }
+    .card {
+      margin-bottom: 16px;
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--paper);
+      box-shadow: 0 2px 8px rgb(23 33 38 / 4%);
+    }
+    .card h2 { margin: 0 0 15px; font-size: 1.05rem; }
+    .fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .field { min-width: 0; }
+    .field.full { grid-column: 1 / -1; }
+    label { display: block; margin-bottom: 5px; font-size: .83rem; font-weight: 650; }
+    input, select, textarea {
+      display: block;
+      width: 100%;
+      min-height: 40px;
+      padding: 8px 10px;
+      border: 1px solid #cbd4d6;
+      border-radius: 6px;
+      color: var(--ink);
+      background: #fff;
+    }
+    textarea { min-height: 76px; resize: vertical; }
+    input:focus, select:focus, textarea:focus { outline: 2px solid #8ab9bd; outline-offset: 1px; }
+    .field-hint { display: block; margin-top: 5px; color: var(--muted); font-size: .76rem; line-height: 1.4; }
+
+    .line-items { display: grid; gap: 12px; }
+    .line-item {
+      display: grid;
+      grid-template-columns: minmax(135px, 1.35fr) minmax(115px, 1.2fr) 70px 105px 88px 32px;
+      gap: 7px;
+      align-items: end;
+      padding: 11px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--soft);
+    }
+    .line-item label { font-size: .72rem; }
+    .line-item input, .line-item select { min-height: 37px; padding: 6px 7px; font-size: .84rem; }
+    .remove-line { width: 32px; height: 37px; border: 0; border-radius: 6px; color: #7c211a; background: #f9e8e6; font-weight: 700; }
+    .item-net { padding: 9px 2px; text-align: right; font-variant-numeric: tabular-nums; font-size: .84rem; }
+    .button-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 13px; }
+    .button {
+      min-height: 40px;
+      padding: 9px 14px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      color: var(--ink);
+      background: #fff;
+      font-weight: 650;
+    }
+    .button:hover { background: #f1f4f4; }
+    .button.primary { color: #fff; border-color: var(--accent); background: var(--accent); }
+    .button.primary:hover { border-color: var(--accent-dark); background: var(--accent-dark); }
+    .button.danger { color: #7c211a; }
+    .actions { display: flex; flex-wrap: wrap; gap: 9px; }
+    .actions .button { flex: 1 1 auto; }
+
+    .paper {
+      min-height: 297mm;
+      max-width: 210mm;
+      margin: 0 auto;
+      padding: 17mm 16mm;
+      background: var(--paper);
+      box-shadow: 0 5px 24px rgb(23 33 38 / 12%);
+      font-family: Arial, sans-serif;
+      font-size: 10pt;
+      line-height: 1.45;
+    }
+    .invoice-warning {
+      margin-bottom: 15px;
+      padding: 9px 11px;
+      border: 1px solid #d9a649;
+      border-radius: 4px;
+      color: #684500;
+      background: #fff4d9;
+      font-size: 9pt;
+      font-weight: 700;
+    }
+    .invoice-warning:empty { display: none; }
+    .invoice-head { display: flex; justify-content: space-between; gap: 20px; padding-bottom: 18px; border-bottom: 3px solid var(--accent); }
+    .wordmark { color: var(--ink); font-size: 24pt; font-weight: 800; letter-spacing: -.04em; }
+    .wordmark span { color: var(--accent); }
+    .tagline { color: var(--muted); font-size: 9pt; }
+    .sender { max-width: 52%; color: #3d494d; text-align: right; font-size: 8.5pt; white-space: pre-line; }
+    .recipient { min-height: 75px; padding-top: 21px; white-space: pre-line; }
+    .recipient-sender { margin-bottom: 6px; color: var(--muted); font-size: 7.5pt; }
+    .invoice-title { display: flex; justify-content: space-between; gap: 20px; margin: 14px 0; }
+    .invoice-title h2 { margin: 0; font-size: 20pt; }
+    .invoice-meta { min-width: 185px; font-size: 9pt; }
+    .invoice-meta div { display: flex; justify-content: space-between; gap: 10px; }
+    .vehicle { margin: 13px 0; padding: 9px 11px; background: #f4f6f6; font-size: 9pt; }
+    .vehicle:empty { display: none; }
+    .preview-table { width: 100%; margin-top: 16px; border-collapse: collapse; font-size: 9pt; }
+    .preview-table th { padding: 8px 5px; border-bottom: 1px solid var(--ink); text-align: left; }
+    .preview-table th.num, .preview-table td.num { text-align: right; white-space: nowrap; }
+    .preview-table td { padding: 8px 5px; border-bottom: 1px solid #e6eaea; vertical-align: top; }
+    .totals { width: min(100%, 290px); margin: 14px 0 0 auto; font-size: 9pt; }
+    .total-row { display: flex; justify-content: space-between; gap: 15px; padding: 4px 0; }
+    .total-row.grand { margin-top: 4px; padding-top: 9px; border-top: 1px solid var(--ink); font-size: 12pt; font-weight: 700; }
+    .notes { margin-top: 22px; white-space: pre-line; }
+    .payment { margin-top: 15px; padding-top: 10px; border-top: 1px solid var(--line); color: #3d494d; font-size: 8.5pt; white-space: pre-line; }
+    .invoice-footer { margin-top: 25px; padding-top: 9px; border-top: 1px solid var(--line); color: var(--muted); text-align: center; font-size: 7.5pt; }
+
+    @media (max-width: 1050px) {
+      .workspace { grid-template-columns: 1fr; }
+      .preview-column { position: static; grid-row: 1; max-height: none; overflow: visible; }
+      .paper { min-height: auto; }
+    }
+    @media (max-width: 760px) {
+      .line-item { grid-template-columns: minmax(0, 1fr) minmax(90px, .8fr) 64px 90px 76px 32px; overflow-x: auto; }
+      .paper { padding: 24px 18px; }
+      .invoice-head { flex-direction: column; }
+      .sender { max-width: 100%; text-align: left; }
+      .invoice-title { flex-direction: column; }
+      .invoice-meta { min-width: 0; }
+    }
+    @media (max-width: 520px) {
+      .topbar { align-items: flex-start; flex-direction: column; gap: 4px; }
+      .fields { grid-template-columns: 1fr; }
+      .field.full { grid-column: auto; }
+      .line-item { grid-template-columns: 1fr 1fr 1fr; overflow: visible; }
+      .line-item .description-field { grid-column: 1 / -1; }
+      .line-item .service-field { grid-column: 1 / -1; }
+      .line-item .remove-wrap { grid-column: 3; grid-row: 2; justify-self: end; }
+      .line-item .item-net { grid-column: 1 / 3; grid-row: 2; text-align: left; }
+    }
+    @media print {
+      @page { size: A4; margin: 0; }
+      html, body { width: 210mm; min-width: 0; margin: 0; background: #fff; }
+      .topbar, .intro, .privacy-note, .price-note, .editor, .screen-only, .message { display: none !important; }
+      .page { width: 210mm; max-width: none; margin: 0; padding: 0; }
+      .workspace { display: block; }
+      .preview-column { position: static; display: block; max-height: none; overflow: visible; }
+      .paper { width: 210mm; min-height: 297mm; max-width: none; margin: 0; padding: 17mm 16mm; box-shadow: none; }
+      .preview-table thead { display: table-header-group; }
+      .preview-table tr, .totals, .payment, .invoice-head { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-brand">IhrMotor.de <span style="font-weight:400">| Rechnungen</span></div>
+    <div class="topbar-caption">Lokal auf diesem Gerät gespeichert</div>
+  </header>
+
+  <main class="page">
+    <section class="intro">
+      <h1>Rechnung erstellen</h1>
+      <p>Kundendaten und Leistungen eintragen, Vorschau prüfen und als PDF drucken.</p>
+    </section>
+
+    <div id="storageMessage" class="message" role="status" aria-live="polite"></div>
+    <div class="privacy-note"><strong>Vorlage für GitLab:</strong> Absender- und Bankdaten sind Platzhalter. Vor echten Rechnungen vollständig ersetzen. <strong>Datenschutz:</strong> Rechnungen und Entwürfe bleiben in diesem Browser auf diesem Gerät. Sie werden nicht an GitLab oder einen Server übertragen. Browserdaten regelmäßig sichern.</div>
+    <div class="price-note"><strong>Preisinfo von ihrmotor.de:</strong> Die Website nennt €400 netto für eine Motorschadensanalyse (Standardmotor bis 4 Zylinder / 2.600 cm³) und €100 netto je weiterem Zylinder. Andere Leistungen haben dort keine veröffentlichten Preise; bitte den vereinbarten Betrag eintragen.</div>
+
+    <div class="workspace">
+      <section class="editor" aria-label="Rechnungsdaten">
+        <div class="card screen-only">
+          <div class="actions">
+            <button id="printInvoice" class="button primary" type="button">Drucken / als PDF speichern</button>
+            <button id="saveInvoice" class="button" type="button">Rechnung lokal speichern</button>
+            <button id="newInvoice" class="button" type="button">Neue Rechnung</button>
+          </div>
+          <small class="field-hint">Drucken ist auch mit leeren Feldern möglich. Fehlende Angaben werden auf der Rechnung gekennzeichnet. Im Druckdialog „Als PDF speichern“ wählen.</small>
+        </div>
+
+        <div class="card">
+          <h2>Rechnung</h2>
+          <div class="field full">
+            <label><input id="demoMode" type="checkbox" checked style="display:inline-block;width:auto;min-height:0;margin:0 6px 0 0"> Diese Rechnung als Muster / Demo kennzeichnen</label>
+          </div>
+          <div class="fields">
+            <div class="field">
+              <label for="invoiceNumber">Rechnungsnummer</label>
+              <input id="invoiceNumber" autocomplete="off" value="2026-001">
+            </div>
+            <div class="field">
+              <label for="invoiceDate">Rechnungsdatum</label>
+              <input id="invoiceDate" type="date">
+            </div>
+            <div class="field">
+              <label for="serviceDate">Leistungsdatum</label>
+              <input id="serviceDate" type="date">
+              <small class="field-hint">Bitte auf den tatsächlichen Leistungstag anpassen.</small>
+            </div>
+            <div class="field">
+              <label for="dueDate">Zahlbar bis (optional)</label>
+              <input id="dueDate" type="date">
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Kunde</h2>
+          <div class="fields">
+            <div class="field full">
+              <label for="customerName">Name / Firma</label>
+              <input id="customerName" autocomplete="name">
+            </div>
+            <div class="field full">
+              <label for="customerAddress">Anschrift</label>
+              <textarea id="customerAddress" autocomplete="street-address" placeholder="Straße und Hausnummer&#10;PLZ und Ort"></textarea>
+            </div>
+            <div class="field">
+              <label for="customerEmail">E-Mail (optional)</label>
+              <input id="customerEmail" type="email" autocomplete="email">
+            </div>
+            <div class="field">
+              <label for="customerNumber">Kundennummer (optional)</label>
+              <input id="customerNumber" autocomplete="off">
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Fahrzeug (optional)</h2>
+          <div class="fields">
+            <div class="field"><label for="vehicle">Fahrzeug / Modell</label><input id="vehicle" placeholder="z. B. VW Golf"></div>
+            <div class="field"><label for="registration">Kennzeichen</label><input id="registration"></div>
+            <div class="field"><label for="vin">Fahrzeug-Ident-Nr. (FIN)</label><input id="vin"></div>
+            <div class="field"><label for="mileage">Kilometerstand</label><input id="mileage" inputmode="numeric"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Leistungen und Teile</h2>
+          <div id="lineItems" class="line-items"></div>
+          <div class="button-row">
+            <button id="addLine" class="button" type="button">+ Position hinzufügen</button>
+          </div>
+          <small class="field-hint">Einzelpreise netto eingeben. Umsatzsteuer ist je Position änderbar; voreingestellt sind 19 %.</small>
+        </div>
+
+        <div class="card">
+          <h2>Zusätzliche Angaben</h2>
+          <div class="fields">
+            <div class="field full">
+              <label for="note">Hinweis / Zahlungsbedingung (optional)</label>
+              <textarea id="note" placeholder="Zum Beispiel: Vielen Dank für Ihren Auftrag."></textarea>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Gespeicherte Rechnungen auf diesem Gerät</h2>
+          <div class="fields">
+            <div class="field full">
+              <label for="invoiceArchive">Archiv</label>
+              <select id="invoiceArchive"><option value="">Noch keine gespeicherten Rechnungen</option></select>
+            </div>
+          </div>
+          <div class="button-row">
+            <button id="loadInvoice" class="button" type="button">Rechnung laden</button>
+            <button id="deleteInvoice" class="button danger" type="button">Aus Archiv löschen</button>
+          </div>
+          <small class="field-hint">Das lokale Archiv ist nicht synchronisiert oder gesichert. Rechnungen bei Bedarf zusätzlich als PDF speichern.</small>
+        </div>
+
+      </section>
+
+      <section class="preview-column" aria-label="Rechnungsvorschau">
+        <article id="invoice" class="paper">
+          <div id="previewWarning" class="invoice-warning" role="status"></div>
+          <div class="invoice-head">
+            <div>
+              <div class="wordmark">IhrMotor<span>.de</span></div>
+              <div class="tagline">Motordiagnose und Instandsetzung</div>
+            </div>
+            <div class="sender">IhrMotor.de
+[Inhaber / Firmenname]
+[Straße und Hausnummer]
+[PLZ und Ort]
+Telefon: [Telefonnummer]
+USt-IdNr.: DExxxx</div>
+          </div>
+          <div class="recipient">
+            <div class="recipient-sender">IhrMotor.de · [Straße und Hausnummer] · [PLZ und Ort]</div>
+            <div id="previewCustomer"></div>
+          </div>
+          <div class="invoice-title">
+            <h2>Rechnung</h2>
+            <div class="invoice-meta">
+              <div><span>Rechnungsnr.</span><strong id="previewNumber">2026-001</strong></div>
+              <div><span>Rechnungsdatum</span><strong id="previewDate"></strong></div>
+              <div><span>Leistungsdatum</span><strong id="previewServiceDate"></strong></div>
+              <div id="dueDatePreviewRow"><span>Zahlbar bis</span><strong id="previewDueDate"></strong></div>
+              <div id="customerNumberPreviewRow"><span>Kundennr.</span><strong id="previewCustomerNumber"></strong></div>
+            </div>
+          </div>
+          <div id="previewVehicle" class="vehicle"></div>
+          <table class="preview-table">
+            <thead>
+              <tr>
+                <th>Pos.</th>
+                <th>Beschreibung</th>
+                <th class="num">Menge</th>
+                <th class="num">Einzel netto</th>
+                <th class="num">USt.</th>
+                <th class="num">Gesamt netto</th>
+              </tr>
+            </thead>
+            <tbody id="previewItems"></tbody>
+          </table>
+          <div id="previewTotals" class="totals"></div>
+          <div id="previewNote" class="notes"></div>
+          <div id="previewPayment" class="payment">Zahlung an:
+Kontoinhaber: IhrMotor.de
+IBAN: XXXX</div>
+          <footer class="invoice-footer">IhrMotor.de · [Inhaber / Firmenname] · [Straße und Hausnummer] · [PLZ und Ort] · USt-IdNr. DExxxx</footer>
+        </article>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const STORAGE_KEY = "ihrmotor.invoiceApp.v1";
+      const services = [
+        { label: "Auspuffservice" },
+        { label: "Bremsenservice" },
+        { label: "Fahrzeuginspektion" },
+        { label: "Motorinspektion" },
+        { label: "Motorreparatur" },
+        { label: "Motortausch" },
+        { label: "Ölwechsel" },
+        { label: "Reifendienst" },
+        { label: "Motorschadensanalyse (bis 4 Zylinder / 2.600 cm³)", price: 400 },
+        { label: "Mehrzylinder-Zuschlag (je zusätzlichem Zylinder)", price: 100 },
+        { label: "Sonstige Leistung" }
+      ];
+      const fields = [
+        "invoiceNumber", "invoiceDate", "serviceDate", "dueDate", "customerName",
+        "customerAddress", "customerEmail", "customerNumber", "vehicle",
+        "registration", "vin", "mileage", "note"
+      ];
+      const today = new Date();
+      let store = { invoices: [], draft: null };
+      let currentInvoiceId = null;
+      let storageAvailable = true;
+      let saveTimer;
+
+      const byId = id => document.getElementById(id);
+      const money = amount => new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(amount);
+      const formatDate = value => {
+        if (!value) return "";
+        const date = new Date(`${value}T12:00:00`);
+        return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat("de-DE").format(date);
+      };
+      const dateInputValue = date => {
+        const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+        return local.toISOString().slice(0, 10);
+      };
+
+      function showMessage(text, type) {
+        const message = byId("storageMessage");
+        message.textContent = text;
+        message.className = `message visible ${type || ""}`;
+      }
+
+      function readStore() {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        if (!parsed || !Array.isArray(parsed.invoices)) {
+          throw new Error("Das lokale Rechnungsarchiv hat ein ungültiges Format.");
+        }
+        store = {
+          invoices: parsed.invoices,
+          draft: parsed.draft && typeof parsed.draft === "object" ? parsed.draft : null
+        };
+      }
+
+      function persist() {
+        if (!storageAvailable) return false;
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+          return true;
+        } catch (error) {
+          storageAvailable = false;
+          const reason = error && error.name === "QuotaExceededError"
+            ? "Der Browser-Speicher ist voll."
+            : "Der Browser konnte die lokalen Daten nicht speichern.";
+          showMessage(`${reason} Bitte exportieren Sie Ihre Rechnungen als PDF und prüfen Sie die Browser-Speichereinstellungen.`, "error");
+          return false;
+        }
+      }
+
+      function currentItems() {
+        return [...byId("lineItems").querySelectorAll(".line-item")].map(row => ({
+          service: row.querySelector(".service-select").value,
+          description: row.querySelector(".description-input").value.trim(),
+          quantity: Number(row.querySelector(".quantity-input").value),
+          unitPrice: row.querySelector(".price-input").value === "" ? null : Number(row.querySelector(".price-input").value),
+          vat: Number(row.querySelector(".vat-select").value)
+        }));
+      }
+
+      function readForm() {
+        const data = {};
+        for (const id of fields) data[id] = byId(id).value;
+        data.items = currentItems();
+        data.demoMode = byId("demoMode").checked;
+        return data;
+      }
+
+      function scheduleDraftSave() {
+        clearTimeout(saveTimer);
+        saveTimer = setTimeout(() => {
+          store.draft = readForm();
+          persist();
+        }, 300);
+      }
+
+      function renderArchive() {
+        const select = byId("invoiceArchive");
+        const selected = select.value;
+        select.replaceChildren();
+        if (!store.invoices.length) {
+          const option = new Option("Noch keine gespeicherten Rechnungen", "");
+          select.add(option);
+          return;
+        }
+        const option = new Option("Rechnung auswählen …", "");
+        select.add(option);
+        [...store.invoices]
+          .sort((a, b) => String(b.invoiceDate).localeCompare(String(a.invoiceDate)) || String(b.invoiceNumber).localeCompare(String(a.invoiceNumber)))
+          .forEach(invoice => {
+            const label = `${invoice.invoiceNumber || "Ohne Nummer"} · ${invoice.customerName || "Ohne Kundennamen"} · ${formatDate(invoice.invoiceDate)}`;
+            select.add(new Option(label, invoice.id));
+          });
+        if (store.invoices.some(invoice => invoice.id === selected)) select.value = selected;
+      }
+
+      function nextInvoiceNumber() {
+        const current = byId("invoiceNumber").value.trim();
+        const match = current.match(/^(\d{4}-)(\d+)$/);
+        const base = match ? match[1] : "2026-";
+        const width = match ? match[2].length : 3;
+        const year = base.slice(0, 4);
+        let max = 0;
+        for (const invoice of store.invoices) {
+          const saved = String(invoice.invoiceNumber || "").match(/^(\d{4})-(\d+)$/);
+          if (saved && saved[1] === year) max = Math.max(max, Number(saved[2]));
+        }
+        return `${base}${String(max + 1).padStart(Math.max(3, width), "0")}`;
+      }
+
+      function createLineItem(item = {}) {
+        const row = document.createElement("div");
+        row.className = "line-item";
+        row.innerHTML = `
+          <div class="field service-field">
+            <label>Leistung</label>
+            <select class="service-select" aria-label="Leistung">
+              <option value="">Auswählen …</option>
+              ${services.map(service => `<option value="${service.label}">${service.label}</option>`).join("")}
+            </select>
+          </div>
+          <div class="field description-field">
+            <label>Beschreibung</label>
+            <input class="description-input" aria-label="Beschreibung" placeholder="Leistung oder Ersatzteil">
+          </div>
+          <div class="field">
+            <label>Menge</label>
+            <input class="quantity-input" aria-label="Menge" type="number" min="0.01" step="0.01" value="1">
+          </div>
+          <div class="field">
+            <label>Einzelpreis netto</label>
+            <input class="price-input" aria-label="Einzelpreis netto" type="number" min="0" step="0.01" placeholder="0,00">
+          </div>
+          <div class="field">
+            <label>USt.</label>
+            <select class="vat-select" aria-label="Umsatzsteuer">
+              <option value="19">19 %</option>
+              <option value="7">7 %</option>
+              <option value="0">0 %</option>
+            </select>
+          </div>
+          <div class="remove-wrap">
+            <label>&nbsp;</label>
+            <button class="remove-line" type="button" aria-label="Position entfernen" title="Position entfernen">×</button>
+          </div>
+          <div class="item-net">Netto: <strong>0,00 €</strong></div>`;
+        const service = row.querySelector(".service-select");
+        const description = row.querySelector(".description-input");
+        const price = row.querySelector(".price-input");
+        service.addEventListener("change", () => {
+          const selectedService = services.find(candidate => candidate.label === service.value);
+          if (!description.value.trim() || services.some(candidate => candidate.label === description.value)) {
+            description.value = service.value;
+          }
+          price.value = selectedService && selectedService.price !== undefined ? selectedService.price.toFixed(2) : "";
+          updatePreview();
+          scheduleDraftSave();
+        });
+        row.querySelector(".remove-line").addEventListener("click", () => {
+          row.remove();
+          updatePreview();
+          scheduleDraftSave();
+        });
+        row.querySelectorAll("input, select").forEach(control => {
+          if (control !== service) {
+            control.addEventListener("input", () => { updatePreview(); scheduleDraftSave(); });
+            control.addEventListener("change", () => { updatePreview(); scheduleDraftSave(); });
+          }
+        });
+        if (item.service) service.value = item.service;
+        description.value = item.description || "";
+        row.querySelector(".quantity-input").value = item.quantity || 1;
+        price.value = item.unitPrice === null || item.unitPrice === undefined ? "" : item.unitPrice;
+        row.querySelector(".vat-select").value = String(item.vat ?? 19);
+        byId("lineItems").append(row);
+        return row;
+      }
+
+      function setForm(data) {
+        for (const id of fields) byId(id).value = data[id] || "";
+        byId("demoMode").checked = Boolean(data.demoMode);
+        byId("lineItems").replaceChildren();
+        (Array.isArray(data.items) && data.items.length ? data.items : [{}]).forEach(createLineItem);
+        updatePreview();
+      }
+
+      function setText(id, text) {
+        byId(id).textContent = text;
+      }
+
+      function updatePreview() {
+        const data = readForm();
+        const missing = [];
+        if (!data.invoiceNumber.trim()) missing.push("Rechnungsnummer");
+        if (!data.invoiceDate) missing.push("Rechnungsdatum");
+        if (!data.serviceDate) missing.push("Leistungsdatum");
+        if (!data.customerName.trim()) missing.push("Kundenname");
+        if (!data.customerAddress.trim()) missing.push("Kundenanschrift");
+        if (!data.items.length || data.items.some(item => !item.description || !Number.isFinite(item.unitPrice) || !Number.isFinite(item.quantity) || item.quantity <= 0)) {
+          missing.push("vollständige Leistungsposition mit Menge und Preis");
+        }
+        const warning = byId("previewWarning");
+        if (data.demoMode) {
+          warning.textContent = "MUSTERRECHNUNG – Beispieldaten. Nicht als echte Rechnung verwenden.";
+        } else if (missing.length) {
+          warning.textContent = `UNVOLLSTÄNDIGE VORLAGE – Fehlende Angaben: ${missing.join(", ")}. Diese Vorschau ist keine vollständige Rechnung.`;
+        } else {
+          warning.textContent = "";
+        }
+        setText("previewNumber", data.invoiceNumber || "—");
+        setText("previewDate", formatDate(data.invoiceDate) || "—");
+        setText("previewServiceDate", formatDate(data.serviceDate) || "—");
+        setText("previewDueDate", formatDate(data.dueDate));
+        byId("dueDatePreviewRow").style.display = data.dueDate ? "flex" : "none";
+        setText("previewCustomerNumber", data.customerNumber);
+        byId("customerNumberPreviewRow").style.display = data.customerNumber ? "flex" : "none";
+        const customer = [data.customerName, data.customerAddress].filter(Boolean).join("\n");
+        setText("previewCustomer", customer || "Kundenname und Anschrift");
+
+        const vehicleDetails = [
+          data.vehicle && `Fahrzeug: ${data.vehicle}`,
+          data.registration && `Kennzeichen: ${data.registration}`,
+          data.vin && `FIN: ${data.vin}`,
+          data.mileage && `Kilometerstand: ${data.mileage} km`
+        ].filter(Boolean);
+        setText("previewVehicle", vehicleDetails.join(" · "));
+
+        const items = data.items;
+        const body = byId("previewItems");
+        body.replaceChildren();
+        const vatTotals = new Map();
+        let netTotal = 0;
+        items.forEach((item, index) => {
+          const quantity = Number.isFinite(item.quantity) ? item.quantity : 0;
+          const unitPrice = Number.isFinite(item.unitPrice) ? item.unitPrice : 0;
+          const net = quantity * unitPrice;
+          netTotal += net;
+          vatTotals.set(item.vat, (vatTotals.get(item.vat) || 0) + net * item.vat / 100);
+          const tr = document.createElement("tr");
+          const values = [
+            String(index + 1),
+            item.description || "—",
+            Number.isFinite(quantity) ? new Intl.NumberFormat("de-DE", { maximumFractionDigits: 2 }).format(quantity) : "—",
+            money(unitPrice),
+            `${item.vat} %`,
+            money(net)
+          ];
+          values.forEach((value, cellIndex) => {
+            const td = document.createElement("td");
+            td.textContent = value;
+            if (cellIndex >= 2) td.className = "num";
+            tr.append(td);
+          });
+          body.append(tr);
+          const row = byId("lineItems").children[index];
+          const netLabel = row && row.querySelector(".item-net strong");
+          if (netLabel) netLabel.textContent = money(net);
+        });
+
+        const taxTotal = [...vatTotals.values()].reduce((sum, amount) => sum + amount, 0);
+        const totals = byId("previewTotals");
+        totals.replaceChildren();
+        const addTotalRow = (label, amount, className = "") => {
+          const row = document.createElement("div");
+          row.className = `total-row ${className}`.trim();
+          const name = document.createElement("span");
+          name.textContent = label;
+          const value = document.createElement("strong");
+          value.textContent = money(amount);
+          row.append(name, value);
+          totals.append(row);
+        };
+        addTotalRow("Nettobetrag", netTotal);
+        [...vatTotals.entries()].sort((a, b) => b[0] - a[0]).forEach(([rate, amount]) => {
+          addTotalRow(`Umsatzsteuer ${rate} %`, amount);
+        });
+        addTotalRow("Rechnungsbetrag", netTotal + taxTotal, "grand");
+        setText("previewNote", data.note);
+      }
+
+      function validationError() {
+        const data = readForm();
+        if (!data.invoiceNumber.trim()) return "Bitte eine Rechnungsnummer eintragen.";
+        if (!data.invoiceDate) return "Bitte das Rechnungsdatum eintragen.";
+        if (!data.serviceDate) return "Bitte das Leistungsdatum eintragen.";
+        if (!data.customerName.trim()) return "Bitte den Namen oder die Firma des Kunden eintragen.";
+        if (!data.customerAddress.trim()) return "Bitte die vollständige Kundenanschrift eintragen.";
+        if (!data.items.length || data.items.some(item => !item.description || !Number.isFinite(item.unitPrice) || !Number.isFinite(item.quantity) || item.quantity <= 0)) {
+          return "Bitte für jede Rechnungsposition eine Beschreibung, Menge und einen gültigen Nettopreis eintragen.";
+        }
+        return "";
+      }
+
+      function saveInvoice() {
+        const error = validationError();
+        if (error) {
+          showMessage(error, "error");
+          return false;
+        }
+        if (!storageAvailable) {
+          showMessage("Speichern ist nicht möglich, weil der Browser-Speicher derzeit nicht verfügbar ist.", "error");
+          return false;
+        }
+        const data = readForm();
+        const duplicate = store.invoices.find(invoice => invoice.invoiceNumber === data.invoiceNumber && invoice.id !== currentInvoiceId);
+        if (duplicate) {
+          showMessage("Diese Rechnungsnummer ist bereits im lokalen Archiv vergeben. Bitte eine eindeutige Nummer verwenden.", "error");
+          return false;
+        }
+        const id = currentInvoiceId || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        const record = { ...data, id, savedAt: new Date().toISOString() };
+        const index = store.invoices.findIndex(invoice => invoice.id === id);
+        if (index === -1) store.invoices.push(record);
+        else store.invoices[index] = record;
+        currentInvoiceId = id;
+        store.draft = data;
+        if (!persist()) return false;
+        renderArchive();
+        byId("invoiceArchive").value = id;
+        showMessage(`Rechnung ${data.invoiceNumber} wurde lokal in diesem Browser gespeichert.`, "success");
+        return true;
+      }
+
+      function startNewInvoice() {
+        currentInvoiceId = null;
+        const next = nextInvoiceNumber();
+        setForm({
+          invoiceNumber: next,
+          invoiceDate: dateInputValue(today),
+          serviceDate: dateInputValue(today),
+          dueDate: "",
+          customerName: "",
+          customerAddress: "",
+          customerEmail: "",
+          customerNumber: "",
+          vehicle: "",
+          registration: "",
+          vin: "",
+          mileage: "",
+          note: "",
+          items: [{}]
+        });
+        store.draft = readForm();
+        persist();
+        byId("invoiceArchive").value = "";
+        showMessage("Neue Rechnung begonnen. Die Rechnungsnummer wurde aus dem lokalen Archiv ermittelt.", "success");
+      }
+
+      function loadSelectedInvoice() {
+        const invoice = store.invoices.find(record => record.id === byId("invoiceArchive").value);
+        if (!invoice) {
+          showMessage("Bitte zuerst eine gespeicherte Rechnung auswählen.", "error");
+          return;
+        }
+        currentInvoiceId = invoice.id;
+        setForm(invoice);
+        store.draft = readForm();
+        persist();
+        showMessage(`Rechnung ${invoice.invoiceNumber} geladen. Änderungen werden erst nach erneutem Speichern im Archiv übernommen.`, "success");
+      }
+
+      function deleteSelectedInvoice() {
+        const id = byId("invoiceArchive").value;
+        const invoice = store.invoices.find(record => record.id === id);
+        if (!invoice) {
+          showMessage("Bitte zuerst eine gespeicherte Rechnung auswählen.", "error");
+          return;
+        }
+        if (!confirm(`Rechnung ${invoice.invoiceNumber} wirklich aus dem lokalen Archiv löschen? Gespeicherte PDF-Dateien werden dadurch nicht gelöscht.`)) return;
+        store.invoices = store.invoices.filter(record => record.id !== id);
+        if (currentInvoiceId === id) currentInvoiceId = null;
+        persist();
+        renderArchive();
+        showMessage(`Rechnung ${invoice.invoiceNumber} wurde aus dem lokalen Archiv gelöscht.`, "success");
+      }
+
+      function initialize() {
+        try {
+          readStore();
+        } catch (error) {
+          storageAvailable = false;
+          const detail = error instanceof Error ? error.message : "Unbekannter Speicherfehler.";
+          showMessage(`Lokale Rechnungsdaten konnten nicht gelesen werden: ${detail} Das Archiv wurde nicht überschrieben.`, "error");
+        }
+        renderArchive();
+        for (const id of fields) {
+          byId(id).addEventListener("input", () => { updatePreview(); scheduleDraftSave(); });
+          byId(id).addEventListener("change", () => { updatePreview(); scheduleDraftSave(); });
+        }
+        byId("addLine").addEventListener("click", () => {
+          createLineItem();
+          updatePreview();
+          scheduleDraftSave();
+        });
+        byId("saveInvoice").addEventListener("click", saveInvoice);
+        byId("newInvoice").addEventListener("click", startNewInvoice);
+        byId("loadInvoice").addEventListener("click", loadSelectedInvoice);
+        byId("deleteInvoice").addEventListener("click", deleteSelectedInvoice);
+        byId("printInvoice").addEventListener("click", () => {
+          window.print();
+        });
+        byId("demoMode").addEventListener("change", () => {
+          updatePreview();
+          scheduleDraftSave();
+        });
+
+        if (store.draft) {
+          setForm(store.draft);
+          currentInvoiceId = store.invoices.find(invoice => invoice.invoiceNumber === store.draft.invoiceNumber)?.id || null;
+        } else {
+          setForm({
+            invoiceNumber: "2026-001",
+            invoiceDate: dateInputValue(today),
+            serviceDate: dateInputValue(today),
+            dueDate: "",
+            customerName: "Max Mustermann (TESTKUNDE)",
+            customerAddress: "Musterstraße 1\n12345 Musterstadt",
+            demoMode: true,
+            items: [{
+              service: "Sonstige Leistung",
+              description: "Beispiel-Leistung – Preis bitte anpassen",
+              quantity: 1,
+              unitPrice: 0,
+              vat: 19
+            }]
+          });
+        }
+        updatePreview();
+      }
+
+      initialize();
+    })();
+  </script>
+</body>
+</html>

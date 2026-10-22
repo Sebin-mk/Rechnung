@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#172126">
-  <title>Rechnung erstellen | IhrMotor.de</title>
+  <title>Rechnungsvorlage</title>
   <style>
     :root {
       color-scheme: light;
@@ -49,7 +49,6 @@
       font-size: .9rem;
     }
     .privacy-note { margin: 16px 0 20px; background: #edf6f1; border-color: #c9dfd2; }
-    .price-note { margin: 0 0 18px; background: #fff8e9; border-color: #e9d9ae; }
     .message { display: none; margin: 0 0 16px; }
     .message.visible { display: block; }
     .message.error { color: #7c211a; background: #fff0ee; border-color: #efc3bd; }
@@ -141,7 +140,6 @@
     .invoice-warning:empty { display: none; }
     .invoice-head { display: flex; justify-content: space-between; gap: 20px; padding-bottom: 18px; border-bottom: 3px solid var(--accent); }
     .wordmark { color: var(--ink); font-size: 24pt; font-weight: 800; letter-spacing: -.04em; }
-    .wordmark span { color: var(--accent); }
     .tagline { color: var(--muted); font-size: 9pt; }
     .sender { max-width: 52%; color: #3d494d; text-align: right; font-size: 8.5pt; white-space: pre-line; }
     .recipient { min-height: 75px; padding-top: 21px; white-space: pre-line; }
@@ -189,7 +187,7 @@
     @media print {
       @page { size: A4; margin: 0; }
       html, body { width: 210mm; min-width: 0; margin: 0; background: #fff; }
-      .topbar, .intro, .privacy-note, .price-note, .editor, .screen-only, .message { display: none !important; }
+      .topbar, .intro, .privacy-note, .editor, .screen-only, .message { display: none !important; }
       .page { width: 210mm; max-width: none; margin: 0; padding: 0; }
       .workspace { display: block; }
       .preview-column { position: static; display: block; max-height: none; overflow: visible; }
@@ -201,7 +199,7 @@
 </head>
 <body>
   <header class="topbar">
-    <div class="topbar-brand">IhrMotor.de <span style="font-weight:400">| Rechnungen</span></div>
+    <div class="topbar-brand">Rechnungsvorlage</div>
     <div class="topbar-caption">Lokal auf diesem Gerät gespeichert</div>
   </header>
 
@@ -212,8 +210,7 @@
     </section>
 
     <div id="storageMessage" class="message" role="status" aria-live="polite"></div>
-    <div class="privacy-note"><strong>Vorlage für GitLab:</strong> Absender- und Bankdaten sind Platzhalter. Vor echten Rechnungen vollständig ersetzen. <strong>Datenschutz:</strong> Rechnungen und Entwürfe bleiben in diesem Browser auf diesem Gerät. Sie werden nicht an GitLab oder einen Server übertragen. Browserdaten regelmäßig sichern.</div>
-    <div class="price-note"><strong>Preisinfo von ihrmotor.de:</strong> Die Website nennt €400 netto für eine Motorschadensanalyse (Standardmotor bis 4 Zylinder / 2.600 cm³) und €100 netto je weiterem Zylinder. Andere Leistungen haben dort keine veröffentlichten Preise; bitte den vereinbarten Betrag eintragen.</div>
+    <div class="privacy-note"><strong>Vorlage:</strong> Absender- und Bankdaten sind Platzhalter. Vor echten Rechnungen vollständig ersetzen. <strong>Datenschutz:</strong> Rechnungen und Entwürfe bleiben in diesem Browser auf diesem Gerät. Sie werden nicht an GitLab oder einen Server übertragen. Browserdaten regelmäßig sichern.</div>
 
     <div class="workspace">
       <section class="editor" aria-label="Rechnungsdaten">
@@ -325,18 +322,18 @@
           <div id="previewWarning" class="invoice-warning" role="status"></div>
           <div class="invoice-head">
             <div>
-              <div class="wordmark">IhrMotor<span>.de</span></div>
-              <div class="tagline">Motordiagnose und Instandsetzung</div>
+              <div class="wordmark">[Firmenname]</div>
+              <div class="tagline">[Branche / Leistungen]</div>
             </div>
-            <div class="sender">IhrMotor.de
-[Inhaber / Firmenname]
+            <div class="sender">[Firmenname]
+[Inhaber / Ansprechpartner]
 [Straße und Hausnummer]
 [PLZ und Ort]
 Telefon: [Telefonnummer]
 USt-IdNr.: DExxxx</div>
           </div>
           <div class="recipient">
-            <div class="recipient-sender">IhrMotor.de · [Straße und Hausnummer] · [PLZ und Ort]</div>
+            <div class="recipient-sender">[Firmenname] · [Straße und Hausnummer] · [PLZ und Ort]</div>
             <div id="previewCustomer"></div>
           </div>
           <div class="invoice-title">
@@ -366,9 +363,9 @@ USt-IdNr.: DExxxx</div>
           <div id="previewTotals" class="totals"></div>
           <div id="previewNote" class="notes"></div>
           <div id="previewPayment" class="payment">Zahlung an:
-Kontoinhaber: IhrMotor.de
+Kontoinhaber: [Firmenname]
 IBAN: XXXX</div>
-          <footer class="invoice-footer">IhrMotor.de · [Inhaber / Firmenname] · [Straße und Hausnummer] · [PLZ und Ort] · USt-IdNr. DExxxx</footer>
+          <footer class="invoice-footer">[Firmenname] · [Inhaber / Ansprechpartner] · [Straße und Hausnummer] · [PLZ und Ort] · USt-IdNr. DExxxx</footer>
         </article>
       </section>
     </div>
@@ -388,8 +385,6 @@ IBAN: XXXX</div>
         { label: "Motortausch" },
         { label: "Ölwechsel" },
         { label: "Reifendienst" },
-        { label: "Motorschadensanalyse (bis 4 Zylinder / 2.600 cm³)", price: 400 },
-        { label: "Mehrzylinder-Zuschlag (je zusätzlichem Zylinder)", price: 100 },
         { label: "Sonstige Leistung" }
       ];
       const fields = [
